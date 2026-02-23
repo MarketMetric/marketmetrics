@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Stock Metrics — Market Metrics</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #06080f; --surface: #0d1117; --border: #1c2333;
+      --accent: #00e5a0; --text: #e8eaf0; --muted: #5a6478;
+      --nav-width: 240px; --red: #ff4d6d;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; overflow-x: hidden; }
+    .layout { display: flex; min-height: 100vh; }
+
+    .nav { position: fixed; top: 0; right: 0; width: var(--nav-width); height: 100vh; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 40px 0; z-index: 100; }
+    .nav-label { font-size: 9px; letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase; padding: 0 28px 20px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+    .nav-link { display: flex; align-items: center; gap: 12px; padding: 14px 28px; color: var(--muted); text-decoration: none; font-size: 12px; letter-spacing: 0.05em; font-weight: 500; transition: color 0.2s, background 0.2s; position: relative; }
+    .nav-link::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent); transform: scaleY(0); transition: transform 0.2s; }
+    .nav-link:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .nav-link:hover::before { transform: scaleY(1); }
+    .nav-link.active { color: var(--accent); background: rgba(0,229,160,0.06); }
+    .nav-link.active::before { transform: scaleY(1); }
+    .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+    .nav-link.active .nav-dot { box-shadow: 0 0 8px var(--accent); }
+    .nav-footer { margin-top: auto; padding: 20px 28px 0; border-top: 1px solid var(--border); font-size: 9px; letter-spacing: 0.1em; color: var(--muted); }
+
+    .main { flex: 1; margin-right: var(--nav-width); display: flex; flex-direction: column; min-height: 100vh; position: relative; }
+    .main::before { content: ''; position: fixed; inset: 0; right: var(--nav-width); background-image: linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px); background-size: 60px 60px; pointer-events: none; }
+    .main::after { content: ''; position: fixed; top: -100px; right: 300px; width: 500px; height: 500px; background: radial-gradient(circle, rgba(0,229,160,0.07) 0%, transparent 70%); pointer-events: none; animation: drift 14s ease-in-out infinite alternate; }
+    @keyframes drift { from { transform: translate(0,0); } to { transform: translate(-80px,60px); } }
+
+    .page-header { padding: 60px 70px 40px; position: relative; z-index: 1; border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; justify-content: space-between; animation: fadeDown 0.6s ease both; }
+    .page-header-left .eyebrow { font-size: 10px; letter-spacing: 0.3em; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
+    h1 { font-family: 'DM Serif Display', serif; font-size: clamp(32px, 4vw, 52px); line-height: 1.1; letter-spacing: -0.02em; }
+
+    .live-badge { display: flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: 0.15em; color: var(--accent); border: 1px solid rgba(0,229,160,0.3); padding: 8px 16px; }
+    .pulse { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; flex-shrink: 0; }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(0,229,160,0.5); } 50% { box-shadow: 0 0 0 5px rgba(0,229,160,0); } }
+
+    .filter-bar { display: flex; gap: 12px; padding: 20px 70px; border-bottom: 1px solid var(--border); position: relative; z-index: 1; animation: fadeDown 0.6s ease both 0.1s; flex-wrap: wrap; }
+    .search-wrap { position: relative; flex: 1; max-width: 320px; }
+    .search-wrap input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.05em; padding: 10px 12px 10px 36px; outline: none; transition: border-color 0.2s; }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-wrap input::placeholder { color: var(--muted); }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 12px; }
+    .filter-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.1em; padding: 10px 16px; cursor: pointer; text-transform: uppercase; transition: all 0.2s; }
+    .filter-btn:hover, .filter-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,229,160,0.06); }
+    .refresh-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.1em; padding: 10px 16px; cursor: pointer; text-transform: uppercase; transition: all 0.2s; margin-left: auto; }
+    .refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    .summary-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin: 0 70px; background: var(--border); border: 1px solid var(--border); position: relative; z-index: 1; animation: fadeUp 0.8s ease both 0.15s; }
+    .summary-item { background: var(--surface); padding: 20px 24px; }
+    .summary-label { font-size: 9px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+    .summary-value { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+
+    .table-wrap { padding: 0 70px 60px; position: relative; z-index: 1; animation: fadeUp 0.8s ease both 0.2s; }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { border-bottom: 1px solid var(--border); }
+    th { font-size: 9px; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; padding: 16px 12px; text-align: left; font-weight: 400; cursor: pointer; user-select: none; }
+    th:hover { color: var(--text); }
+    th:first-child { padding-left: 0; }
+    th:last-child { text-align: right; padding-right: 0; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; cursor: pointer; }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    td { padding: 18px 12px; font-size: 12px; letter-spacing: 0.03em; }
+    td:first-child { padding-left: 0; }
+    td:last-child { text-align: right; padding-right: 0; }
+
+    .stock-symbol { font-weight: 500; color: var(--text); font-size: 13px; }
+    .stock-name { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: 0.05em; }
+    .price { color: var(--text); font-weight: 500; }
+    .up { color: var(--accent); }
+    .down { color: var(--red); }
+
+    .volume-bar { display: flex; align-items: center; gap: 8px; }
+    .vol-track { width: 60px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .vol-fill { height: 100%; border-radius: 2px; opacity: 0.6; }
+
+    .skeleton { background: linear-gradient(90deg, var(--border) 25%, #1e2a3a 50%, var(--border) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 2px; display: inline-block; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes flashUp { 0% { background: rgba(0,229,160,0.12); } 100% { background: transparent; } }
+    @keyframes flashDown { 0% { background: rgba(255,77,109,0.12); } 100% { background: transparent; } }
+    .flash-up { animation: flashUp 1s ease; }
+    .flash-down { animation: flashDown 1s ease; }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <main class="main">
+
+    <div class="page-header">
+      <div class="page-header-left">
+        <p class="eyebrow">// real-time feed</p>
+        <h1>Live Stock Metrics</h1>
+      </div>
+      <div class="live-badge"><span class="pulse"></span>STREAMING LIVE</div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="searchInput" placeholder="Search ticker or name..." oninput="renderTable()" />
+      </div>
+      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('up',this)">Gainers</button>
+      <button class="filter-btn" onclick="setFilter('down',this)">Losers</button>
+      <button class="refresh-btn" onclick="loadQuotes()">↻ Refresh</button>
+    </div>
+
+    <div class="summary-bar">
+      <div class="summary-item"><div class="summary-label">Advancing</div><div class="summary-value up" id="advancing">—</div></div>
+      <div class="summary-item"><div class="summary-label">Declining</div><div class="summary-value down" id="declining">—</div></div>
+      <div class="summary-item"><div class="summary-label">Avg Change</div><div class="summary-value" id="avgChange">—</div></div>
+      <div class="summary-item"><div class="summary-label">Last Updated</div><div class="summary-value" id="lastUpdated" style="font-size:13px">—</div></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th onclick="sortBy('price')">Price ↕</th>
+            <th onclick="sortBy('change')">Change ↕</th>
+            <th onclick="sortBy('pct')">% Change ↕</th>
+            <th>Volume</th>
+            <th style="text-align:right" onclick="sortBy('cap')">Mkt Cap ↕</th>
+          </tr>
+        </thead>
+        <tbody id="stockTable"></tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <nav class="nav">
+    <div class="nav-label">Pages</div>
+    <a class="nav-link" href="index.html"><span class="nav-dot"></span>Home</a>
+    <a class="nav-link active" href="live-stock-metrics.html"><span class="nav-dot"></span>Live Stock Metrics</a>
+    <a class="nav-link" href="sp500.html"><span class="nav-dot"></span>S&amp;P 500</a>
+    <div class="nav-footer">Market Metrics © 2026</div>
+  </nav>
+</div>
+
+<script>
+  const API = 'http://localhost:3000/api';
+  const SYMBOLS = 'AAPL,MSFT,NVDA,GOOGL,AMZN,META,TSLA,BRK-B,JPM,V,WMT,XOM,UNH,AVGO,LLY,MA,HD,PG,MRK,COST';
+
+  let liveStocks = [];
+  let currentFilter = 'all';
+  let sortKey = null;
+  let sortDir = 1;
+  let prevPrices = {};
+
+  function fmtCap(n) {
+    if (!n) return '—';
+    if (n >= 1e12) return `$${(n/1e12).toFixed(2)}T`;
+    if (n >= 1e9)  return `$${(n/1e9).toFixed(0)}B`;
+    return `$${(n/1e6).toFixed(0)}M`;
+  }
+
+  function fmtVol(n) {
+    if (!n) return '—';
+    if (n >= 1e9) return `${(n/1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `${(n/1e6).toFixed(0)}M`;
+    return `${(n/1e3).toFixed(0)}K`;
+  }
+
+  async function loadQuotes() {
+    try {
+      const res = await fetch(`${API}/quote?symbols=${SYMBOLS}`);
+      const data = await res.json();
+      const quotes = data?.quoteResponse?.result ?? [];
+      const maxVol = Math.max(...quotes.map(q => q.regularMarketVolume ?? 0));
+
+      liveStocks = quotes.map(q => ({
+        symbol: q.symbol,
+        name:   q.shortName ?? q.symbol,
+        price:  q.regularMarketPrice ?? 0,
+        change: q.regularMarketChange ?? 0,
+        pct:    q.regularMarketChangePercent ?? 0,
+        volume: q.regularMarketVolume ?? 0,
+        volPct: Math.min(((q.regularMarketVolume ?? 0) / maxVol) * 100, 100),
+        cap:    q.marketCap ?? 0,
+      }));
+
+      renderTable();
+    } catch (err) {
+      console.error('Quote load error:', err);
+      document.getElementById('stockTable').innerHTML =
+        `<tr><td colspan="6" style="padding:40px 0;color:var(--red);font-size:11px;letter-spacing:0.1em">
+          ⚠ Could not reach server. Make sure it is running on port 3000.
+        </td></tr>`;
+    }
+  }
+
+  function renderTable() {
+    const query = document.getElementById('searchInput').value.toLowerCase();
+
+    let filtered = liveStocks.filter(s => {
+      const matchSearch = s.symbol.toLowerCase().includes(query) || s.name.toLowerCase().includes(query);
+      const matchFilter =
+        currentFilter === 'all' ||
+        (currentFilter === 'up'   && s.pct >= 0) ||
+        (currentFilter === 'down' && s.pct <  0);
+      return matchSearch && matchFilter;
+    });
+
+    if (sortKey) filtered.sort((a, b) => (a[sortKey] - b[sortKey]) * sortDir);
+
+    document.getElementById('stockTable').innerHTML = filtered.map(s => {
+      const up    = s.pct >= 0;
+      const color = up ? '#00e5a0' : '#ff4d6d';
+      const arrow = up ? '▲' : '▼';
+      const sign  = up ? '+' : '';
+      const flash =
+        prevPrices[s.symbol] != null
+          ? s.price > prevPrices[s.symbol] ? 'flash-up'
+          : s.price < prevPrices[s.symbol] ? 'flash-down' : ''
+          : '';
+
+      return `
+        <tr class="${flash}">
+          <td><div class="stock-symbol">${s.symbol}</div><div class="stock-name">${s.name}</div></td>
+          <td class="price">$${s.price.toFixed(2)}</td>
+          <td class="${up ? 'up' : 'down'}">${sign}${s.change.toFixed(2)}</td>
+          <td class="${up ? 'up' : 'down'}">${arrow} ${sign}${s.pct.toFixed(2)}%</td>
+          <td>
+            <div class="volume-bar">
+              <div class="vol-track">
+                <div class="vol-fill" style="width:${s.volPct}%;background:${color}"></div>
+              </div>
+              <span style="font-size:10px;color:var(--muted)">${fmtVol(s.volume)}</span>
+            </div>
+          </td>
+          <td style="text-align:right;color:var(--muted);font-size:11px">${fmtCap(s.cap)}</td>
+        </tr>`;
+    }).join('');
+
+    liveStocks.forEach(s => { prevPrices[s.symbol] = s.price; });
+
+    const adv = liveStocks.filter(s => s.pct >= 0).length;
+    const dec = liveStocks.filter(s => s.pct <  0).length;
+    const avg = liveStocks.length
+      ? liveStocks.reduce((a, s) => a + s.pct, 0) / liveStocks.length : 0;
+
+    document.getElementById('advancing').textContent = adv;
+    document.getElementById('declining').textContent = dec;
+    const avgEl = document.getElementById('avgChange');
+    avgEl.textContent = (avg >= 0 ? '+' : '') + avg.toFixed(2) + '%';
+    avgEl.className = 'summary-value ' + (avg >= 0 ? 'up' : 'down');
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+  }
+
+  function setFilter(type, btn) {
+    currentFilter = type;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+  }
+
+  function sortBy(key) {
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = -1; }
+    renderTable();
+  }
+
+  loadQuotes();
+  setInterval(loadQuotes, 30000);
+</script>
+</body>
+</html>
