@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Stock Metrics — Market Metrics</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #06080f;
+      --surface: #0d1117;
+      --border: #1c2333;
+      --accent: #00e5a0;
+      --accent2: #0070f3;
+      --text: #e8eaf0;
+      --muted: #5a6478;
+      --nav-width: 240px;
+      --red: #ff4d6d;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    .layout { display: flex; min-height: 100vh; }
+
+    .nav {
+      position: fixed;
+      top: 0; right: 0;
+      width: var(--nav-width);
+      height: 100vh;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 40px 0;
+      z-index: 100;
+    }
+
+    .nav-label {
+      font-size: 9px;
+      letter-spacing: 0.25em;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 0 28px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 28px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      font-weight: 500;
+      transition: color 0.2s, background 0.2s;
+      position: relative;
+    }
+
+    .nav-link::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--accent);
+      transform: scaleY(0);
+      transition: transform 0.2s;
+    }
+
+    .nav-link:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .nav-link:hover::before { transform: scaleY(1); }
+    .nav-link.active { color: var(--accent); background: rgba(0,229,160,0.06); }
+    .nav-link.active::before { transform: scaleY(1); }
+
+    .nav-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    .nav-link.active .nav-dot { box-shadow: 0 0 8px var(--accent); }
+
+    .nav-footer {
+      margin-top: auto;
+      padding: 20px 28px 0;
+      border-top: 1px solid var(--border);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .main {
+      flex: 1;
+      margin-right: var(--nav-width);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .main::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      right: var(--nav-width);
+      background-image:
+        linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .main::after {
+      content: '';
+      position: fixed;
+      top: -100px; right: 300px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(0,229,160,0.07) 0%, transparent 70%);
+      pointer-events: none;
+      animation: drift 14s ease-in-out infinite alternate;
+    }
+
+    @keyframes drift {
+      from { transform: translate(0, 0); }
+      to   { transform: translate(-80px, 60px); }
+    }
+
+    .page-header {
+      padding: 60px 70px 40px;
+      position: relative;
+      z-index: 1;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .page-header-left .eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(32px, 4vw, 52px);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      border: 1px solid rgba(0,229,160,0.3);
+      padding: 8px 16px;
+    }
+
+    .pulse {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0,229,160,0.5); }
+      50% { box-shadow: 0 0 0 5px rgba(0,229,160,0); }
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      padding: 20px 70px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 1;
+      animation: fadeDown 0.6s ease both 0.1s;
+    }
+
+    .search-wrap { position: relative; flex: 1; max-width: 320px; }
+
+    .search-wrap input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      padding: 10px 12px 10px 36px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-wrap input::placeholder { color: var(--muted); }
+
+    .search-icon {
+      position: absolute;
+      left: 12px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .filter-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      padding: 10px 16px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(0,229,160,0.06);
+    }
+
+    .table-wrap {
+      padding: 0 70px 60px;
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.8s ease both 0.2s;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead tr { border-bottom: 1px solid var(--border); }
+
+    th {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 16px 12px;
+      text-align: left;
+      font-weight: 400;
+    }
+
+    th:first-child { padding-left: 0; }
+    th:last-child { text-align: right; padding-right: 0; }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+    td { padding: 18px 12px; font-size: 12px; letter-spacing: 0.03em; }
+    td:first-child { padding-left: 0; }
+    td:last-child { text-align: right; padding-right: 0; }
+
+    .stock-symbol { font-weight: 500; color: var(--text); font-size: 13px; }
+    .stock-name { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: 0.05em; }
+    .price { color: var(--text); font-weight: 500; }
+    .up { color: var(--accent); }
+    .down { color: var(--red); }
+
+    .mini-bar { width: 80px; height: 28px; }
+    .mini-bar polyline { fill: none; stroke-width: 1.5; stroke-linejoin: round; }
+
+    .volume-bar { display: flex; align-items: center; gap: 8px; }
+
+    .vol-track {
+      width: 60px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .vol-fill { height: 100%; background: var(--accent); border-radius: 2px; opacity: 0.6; }
+
+    .summary-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      margin: 0 70px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.8s ease both 0.15s;
+    }
+
+    .summary-item { background: var(--surface); padding: 20px 24px; }
+
+    .summary-label {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .summary-value { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <main class="main">
+
+    <div class="page-header">
+      <div class="page-header-left">
+        <p class="eyebrow">// real-time feed</p>
+        <h1>Live Stock Metrics</h1>
+      </div>
+      <div class="live-badge">
+        <span class="pulse"></span>
+        STREAMING LIVE
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="searchInput" placeholder="Search ticker or name..." oninput="filterStocks()" />
+      </div>
+      <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+      <button class="filter-btn" onclick="setFilter('up', this)">Gainers</button>
+      <button class="filter-btn" onclick="setFilter('down', this)">Losers</button>
+    </div>
+
+    <div class="summary-bar">
+      <div class="summary-item">
+        <div class="summary-label">Advancing</div>
+        <div class="summary-value up" id="advancing">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Declining</div>
+        <div class="summary-value down" id="declining">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Avg Change</div>
+        <div class="summary-value" id="avgChange">—</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Last Updated</div>
+        <div class="summary-value" id="lastUpdated" style="font-size:13px">—</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Price</th>
+            <th>Change</th>
+            <th>% Change</th>
+            <th>Volume</th>
+            <th>7D Trend</th>
+            <th style="text-align:right">Mkt Cap</th>
+          </tr>
+        </thead>
+        <tbody id="stockTable"></tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <nav class="nav">
+    <div class="nav-label">Pages</div>
+    <a class="nav-link" href="index.html"><span class="nav-dot"></span>Home</a>
+    <a class="nav-link active" href="live-stock-metrics.html"><span class="nav-dot"></span>Live Stock Metrics</a>
+    <a class="nav-link" href="sp500.html"><span class="nav-dot"></span>S&amp;P 500</a>
+    <div class="nav-footer">Market Metrics © 2026</div>
+  </nav>
+</div>
+
+<script>
+  const stocks = [
+    { symbol: 'AAPL', name: 'Apple Inc.', price: 227.52, change: 2.31, pct: 1.03, vol: 58, cap: '3.51T', trend: [210,215,212,218,220,225,227] },
+    { symbol: 'MSFT', name: 'Microsoft Corp.', price: 415.80, change: 5.12, pct: 1.25, vol: 42, cap: '3.09T', trend: [400,403,398,408,410,413,415] },
+    { symbol: 'NVDA', name: 'NVIDIA Corp.', price: 875.43, change: 18.77, pct: 2.19, vol: 91, cap: '2.16T', trend: [820,835,828,845,858,865,875] },
+    { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 192.34, change: -1.22, pct: -0.63, vol: 35, cap: '2.38T', trend: [196,194,197,193,192,191,192] },
+    { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 223.17, change: 3.44, pct: 1.57, vol: 48, cap: '2.36T', trend: [210,214,211,216,219,221,223] },
+    { symbol: 'META', name: 'Meta Platforms', price: 561.28, change: -4.88, pct: -0.86, vol: 29, cap: '1.42T', trend: [570,568,572,565,562,560,561] },
+    { symbol: 'TSLA', name: 'Tesla Inc.', price: 248.75, change: 7.63, pct: 3.16, vol: 88, cap: '793B', trend: [220,228,232,238,242,245,248] },
+    { symbol: 'BRK.B', name: 'Berkshire Hathaway', price: 451.20, change: 0.88, pct: 0.20, vol: 18, cap: '990B', trend: [447,448,449,450,450,451,451] },
+    { symbol: 'JPM', name: 'JPMorgan Chase', price: 238.44, change: -2.11, pct: -0.88, vol: 33, cap: '684B', trend: [243,241,240,239,238,238,238] },
+    { symbol: 'V', name: 'Visa Inc.', price: 312.88, change: 1.44, pct: 0.46, vol: 22, cap: '636B', trend: [308,309,310,311,311,312,312] },
+    { symbol: 'WMT', name: 'Walmart Inc.', price: 96.34, change: -0.55, pct: -0.57, vol: 27, cap: '776B', trend: [98,97,97,96,96,96,96] },
+    { symbol: 'XOM', name: 'Exxon Mobil', price: 112.77, change: 0.93, pct: 0.83, vol: 31, cap: '449B', trend: [109,110,111,111,112,112,112] },
+  ];
+
+  let currentFilter = 'all';
+  let liveStocks = stocks.map(s => ({ ...s }));
+
+  function genSparkPath(trend) {
+    const min = Math.min(...trend);
+    const max = Math.max(...trend);
+    const range = max - min || 1;
+    const w = 80, h = 28;
+    return trend.map((v, i) => {
+      const x = (i / (trend.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x},${y}`;
+    }).join(' ');
+  }
+
+  function renderTable() {
+    const query = document.getElementById('searchInput').value.toLowerCase();
+    const tbody = document.getElementById('stockTable');
+    const filtered = liveStocks.filter(s => {
+      const matchSearch = s.symbol.toLowerCase().includes(query) || s.name.toLowerCase().includes(query);
+      const matchFilter = currentFilter === 'all' || (currentFilter === 'up' && s.pct >= 0) || (currentFilter === 'down' && s.pct < 0);
+      return matchSearch && matchFilter;
+    });
+
+    tbody.innerHTML = filtered.map(s => {
+      const up = s.pct >= 0;
+      const color = up ? '#00e5a0' : '#ff4d6d';
+      const arrow = up ? '▲' : '▼';
+      const sign = up ? '+' : '';
+      const path = genSparkPath(s.trend);
+      return `
+        <tr>
+          <td>
+            <div class="stock-symbol">${s.symbol}</div>
+            <div class="stock-name">${s.name}</div>
+          </td>
+          <td class="price">$${s.price.toFixed(2)}</td>
+          <td class="${up ? 'up' : 'down'}">${sign}${s.change.toFixed(2)}</td>
+          <td class="${up ? 'up' : 'down'}">${arrow} ${sign}${s.pct.toFixed(2)}%</td>
+          <td>
+            <div class="volume-bar">
+              <div class="vol-track"><div class="vol-fill" style="width:${s.vol}%"></div></div>
+              <span style="font-size:10px;color:var(--muted)">${s.vol}M</span>
+            </div>
+          </td>
+          <td>
+            <svg class="mini-bar" viewBox="0 0 80 28">
+              <polyline points="${path}" stroke="${color}" style="fill:none;stroke-width:1.5;stroke-linejoin:round"/>
+            </svg>
+          </td>
+          <td style="text-align:right;color:var(--muted);font-size:11px">${s.cap}</td>
+        </tr>`;
+    }).join('');
+
+    const advancing = liveStocks.filter(s => s.pct >= 0).length;
+    const declining = liveStocks.filter(s => s.pct < 0).length;
+    const avg = liveStocks.reduce((a, s) => a + s.pct, 0) / liveStocks.length;
+    document.getElementById('advancing').textContent = advancing;
+    document.getElementById('declining').textContent = declining;
+    const avgEl = document.getElementById('avgChange');
+    avgEl.textContent = (avg >= 0 ? '+' : '') + avg.toFixed(2) + '%';
+    avgEl.className = 'summary-value ' + (avg >= 0 ? 'up' : 'down');
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+  }
+
+  function filterStocks() { renderTable(); }
+
+  function setFilter(type, btn) {
+    currentFilter = type;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+  }
+
+  function simulateLive() {
+    liveStocks = liveStocks.map(s => {
+      const delta = (Math.random() - 0.48) * 2;
+      const newPrice = Math.max(1, s.price + delta);
+      const newChange = s.change + delta;
+      const newPct = (newChange / (newPrice - newChange)) * 100;
+      const newTrend = [...s.trend.slice(1), newPrice];
+      return { ...s, price: newPrice, change: newChange, pct: newPct, trend: newTrend };
+    });
+    renderTable();
+  }
+
+  renderTable();
+  setInterval(simulateLive, 2500);
+</script>
+</body>
+</html>
