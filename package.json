@@ -1,0 +1,14 @@
+{
+  "name": "market-metrics",
+  "version": "1.0.0",
+  "description": "Market Metrics Dashboard with Yahoo Finance data",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
+    "cors": "^2.8.5"
+  }
+}
