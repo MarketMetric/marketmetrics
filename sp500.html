@@ -1,4 +1,547 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S&P 500 — Market Metrics</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #06080f;
+      --surface: #0d1117;
+      --border: #1c2333;
+      --accent: #00e5a0;
+      --accent2: #0070f3;
+      --text: #e8eaf0;
+      --muted: #5a6478;
+      --nav-width: 240px;
+      --red: #ff4d6d;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    .layout { display: flex; min-height: 100vh; }
+
+    .nav {
+      position: fixed;
+      top: 0; right: 0;
+      width: var(--nav-width);
+      height: 100vh;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 40px 0;
+      z-index: 100;
+    }
+
+    .nav-label {
+      font-size: 9px;
+      letter-spacing: 0.25em;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 0 28px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 28px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      font-weight: 500;
+      transition: color 0.2s, background 0.2s;
+      position: relative;
+    }
+
+    .nav-link::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--accent);
+      transform: scaleY(0);
+      transition: transform 0.2s;
+    }
+
+    .nav-link:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .nav-link:hover::before { transform: scaleY(1); }
+    .nav-link.active { color: var(--accent); background: rgba(0,229,160,0.06); }
+    .nav-link.active::before { transform: scaleY(1); }
+
+    .nav-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    .nav-link.active .nav-dot { box-shadow: 0 0 8px var(--accent); }
+
+    .nav-footer {
+      margin-top: auto;
+      padding: 20px 28px 0;
+      border-top: 1px solid var(--border);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .main {
+      flex: 1;
+      margin-right: var(--nav-width);
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .main::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      right: var(--nav-width);
+      background-image:
+        linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    .main::after {
+      content: '';
+      position: fixed;
+      bottom: -150px; left: 200px;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(0,112,243,0.09) 0%, transparent 70%);
+      pointer-events: none;
+      animation: drift 16s ease-in-out infinite alternate;
+    }
+
+    @keyframes drift {
+      from { transform: translate(0, 0); }
+      to   { transform: translate(60px, -60px); }
+    }
+
+    .page-header {
+      padding: 60px 70px 40px;
+      position: relative;
+      z-index: 1;
+      border-bottom: 1px solid var(--border);
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(36px, 5vw, 62px);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    h1 span { color: var(--accent); font-style: italic; }
+
+    .header-meta { display: flex; gap: 32px; margin-top: 24px; }
+
+    .meta-label {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .meta-value { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
+    .meta-change { font-size: 11px; letter-spacing: 0.04em; margin-top: 2px; }
+
+    .up { color: var(--accent); }
+    .down { color: var(--red); }
+
+    .chart-section {
+      margin: 0 70px;
+      border: 1px solid var(--border);
+      border-top: none;
+      background: var(--surface);
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.8s ease both 0.15s;
+    }
+
+    .chart-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chart-toolbar-label {
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .time-tabs { display: flex; gap: 4px; }
+
+    .time-tab {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      padding: 5px 10px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.15s;
+    }
+
+    .time-tab:hover { color: var(--text); }
+    .time-tab.active { color: var(--accent); background: rgba(0,229,160,0.08); }
+
+    .chart-canvas-wrap { padding: 20px 24px 16px; position: relative; }
+
+    svg#mainChart { width: 100%; height: 220px; overflow: visible; }
+
+    .chart-x-labels {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 24px 16px;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      margin: 1px 70px 0;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-top: none;
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.8s ease both 0.3s;
+    }
+
+    .panel { background: var(--surface); padding: 28px; }
+
+    .panel-title {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sector-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .sector-name { font-size: 11px; letter-spacing: 0.04em; min-width: 120px; color: var(--text); }
+
+    .sector-bar-track {
+      flex: 1; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .sector-bar-fill { height: 100%; border-radius: 2px; }
+    .sector-pct { font-size: 10px; min-width: 48px; text-align: right; }
+
+    .mover-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mover-row:last-child { border-bottom: none; }
+    .mover-symbol { font-size: 13px; font-weight: 500; }
+    .mover-name { font-size: 10px; color: var(--muted); margin-top: 1px; }
+    .mover-pct { font-size: 13px; font-weight: 500; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      margin: 1px 70px 60px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-top: none;
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.8s ease both 0.45s;
+    }
+
+    .stat-cell { background: var(--surface); padding: 24px 20px; }
+
+    .stat-label {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .stat-value { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+    .stat-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <main class="main">
+
+    <div class="page-header">
+      <p class="eyebrow">// index overview</p>
+      <h1>S&amp;P <span>500</span></h1>
+      <div class="header-meta">
+        <div class="meta-item">
+          <div class="meta-label">Index Level</div>
+          <div class="meta-value" id="indexLevel">5,734.28</div>
+          <div class="meta-change up" id="indexChange">▲ +60.71 (+1.07%)</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">52W High</div>
+          <div class="meta-value" style="color:var(--muted)">5,878.46</div>
+          <div class="meta-change" style="color:var(--muted)">Mar 2025</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">52W Low</div>
+          <div class="meta-value" style="color:var(--muted)">4,803.18</div>
+          <div class="meta-change" style="color:var(--muted)">Apr 2025</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">P/E Ratio</div>
+          <div class="meta-value" style="color:var(--muted)">26.4x</div>
+          <div class="meta-change" style="color:var(--muted)">trailing 12m</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-toolbar">
+        <span class="chart-toolbar-label">Price History</span>
+        <div class="time-tabs">
+          <button class="time-tab" onclick="setRange('1D', this)">1D</button>
+          <button class="time-tab" onclick="setRange('1W', this)">1W</button>
+          <button class="time-tab active" onclick="setRange('1M', this)">1M</button>
+          <button class="time-tab" onclick="setRange('3M', this)">3M</button>
+          <button class="time-tab" onclick="setRange('1Y', this)">1Y</button>
+          <button class="time-tab" onclick="setRange('5Y', this)">5Y</button>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <svg id="mainChart" viewBox="0 0 900 220" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00e5a0" stop-opacity="0.18"/>
+              <stop offset="100%" stop-color="#00e5a0" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <line x1="0" y1="44" x2="900" y2="44" stroke="#1c2333" stroke-width="1"/>
+          <line x1="0" y1="88" x2="900" y2="88" stroke="#1c2333" stroke-width="1"/>
+          <line x1="0" y1="132" x2="900" y2="132" stroke="#1c2333" stroke-width="1"/>
+          <line x1="0" y1="176" x2="900" y2="176" stroke="#1c2333" stroke-width="1"/>
+          <text x="0" y="42" font-family="DM Mono" font-size="10" fill="#5a6478">5,850</text>
+          <text x="0" y="86" font-family="DM Mono" font-size="10" fill="#5a6478">5,700</text>
+          <text x="0" y="130" font-family="DM Mono" font-size="10" fill="#5a6478">5,550</text>
+          <text x="0" y="174" font-family="DM Mono" font-size="10" fill="#5a6478">5,400</text>
+          <polygon id="chartFill" fill="url(#chartGrad)"/>
+          <polyline id="chartLine" fill="none" stroke="#00e5a0" stroke-width="2" stroke-linejoin="round"/>
+          <circle id="chartDot" r="4" fill="#00e5a0" filter="url(#glow)"/>
+        </svg>
+      </div>
+      <div class="chart-x-labels" id="xLabels"></div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Sector Performance (Today)</div>
+        <div id="sectors"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Top Movers</div>
+        <div id="movers"></div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-cell">
+        <div class="stat-label">Market Cap</div>
+        <div class="stat-value">$47.3T</div>
+        <div class="stat-sub">Total S&amp;P 500</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Dividend Yield</div>
+        <div class="stat-value">1.32%</div>
+        <div class="stat-sub">TTM average</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Avg Volume</div>
+        <div class="stat-value">4.2B</div>
+        <div class="stat-sub">30-day average</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">VIX</div>
+        <div class="stat-value down">14.33</div>
+        <div class="stat-sub down">▼ -2.41% today</div>
+      </div>
+    </div>
+
+  </main>
+
+  <nav class="nav">
+    <div class="nav-label">Pages</div>
+    <a class="nav-link" href="index.html"><span class="nav-dot"></span>Home</a>
+    <a class="nav-link" href="live-stock-metrics.html"><span class="nav-dot"></span>Live Stock Metrics</a>
+    <a class="nav-link active" href="sp500.html"><span class="nav-dot"></span>S&amp;P 500</a>
+    <div class="nav-footer">Market Metrics © 2026</div>
+  </nav>
+</div>
+
+<script>
+  const chartData = {
+    '1D': { points: [5673,5681,5668,5692,5704,5715,5708,5722,5718,5730,5725,5734], labels: ['9:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:59'] },
+    '1W': { points: [5612,5634,5658,5641,5680,5703,5734], labels: ['Mon','Tue','Wed','Thu','Fri','Mon','Tue'] },
+    '1M': { points: [5480,5510,5490,5530,5555,5520,5545,5570,5560,5590,5610,5580,5620,5650,5630,5660,5680,5670,5700,5720,5710,5734], labels: ['Jan 15','Jan 22','Jan 29','Feb 5','Feb 12','Feb 19','Feb 22'] },
+    '3M': { points: [5200,5250,5230,5280,5310,5290,5340,5370,5350,5400,5430,5410,5460,5490,5480,5520,5550,5530,5580,5620,5660,5700,5734], labels: ['Nov','Dec','Jan','Feb'] },
+    '1Y': { points: [4803,4900,4980,5050,5120,5200,5150,5250,5320,5400,5480,5560,5620,5700,5734], labels: ["Feb '25","Apr","Jun","Aug","Oct","Dec","Feb '26"] },
+    '5Y': { points: [3200,3500,3900,4100,4300,4600,4800,5100,5300,5500,5700,5734], labels: ["2021","2022","2023","2024","2025","2026"] },
+  };
+
+  let currentRange = '1M';
+
+  function renderChart(range) {
+    const data = chartData[range];
+    const pts = data.points;
+    const min = Math.min(...pts) - 20;
+    const max = Math.max(...pts) + 20;
+    const W = 900, H = 220;
+
+    const coords = pts.map((v, i) => {
+      const x = (i / (pts.length - 1)) * W;
+      const y = H - ((v - min) / (max - min)) * H;
+      return [x, y];
+    });
+
+    const linePoints = coords.map(([x, y]) => `${x},${y}`).join(' ');
+    const fillPoints = `${coords[0][0]},${H} ` + linePoints + ` ${coords[coords.length-1][0]},${H}`;
+
+    document.getElementById('chartLine').setAttribute('points', linePoints);
+    document.getElementById('chartFill').setAttribute('points', fillPoints);
+
+    const last = coords[coords.length - 1];
+    document.getElementById('chartDot').setAttribute('cx', last[0]);
+    document.getElementById('chartDot').setAttribute('cy', last[1]);
+
+    const labelCount = Math.min(data.labels.length, 7);
+    const step = Math.floor(data.labels.length / (labelCount - 1));
+    const labels = data.labels.filter((_, i) => i % step === 0 || i === data.labels.length - 1);
+    document.getElementById('xLabels').innerHTML = labels.map(l => `<span>${l}</span>`).join('');
+  }
+
+  function setRange(range, btn) {
+    currentRange = range;
+    document.querySelectorAll('.time-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderChart(range);
+  }
+
+  const sectors = [
+    { name: 'Technology', pct: 2.31, color: '#00e5a0' },
+    { name: 'Financials', pct: 0.88, color: '#00e5a0' },
+    { name: 'Health Care', pct: -0.44, color: '#ff4d6d' },
+    { name: 'Consumer Disc.', pct: 1.54, color: '#00e5a0' },
+    { name: 'Industrials', pct: 0.33, color: '#00e5a0' },
+    { name: 'Energy', pct: -0.91, color: '#ff4d6d' },
+    { name: 'Utilities', pct: -0.12, color: '#ff4d6d' },
+    { name: 'Real Estate', pct: 0.67, color: '#00e5a0' },
+  ];
+
+  document.getElementById('sectors').innerHTML = sectors.map(s => {
+    const sign = s.pct >= 0 ? '+' : '';
+    const w = Math.min(Math.abs(s.pct) / 2.5 * 100, 100);
+    return `
+      <div class="sector-row">
+        <div class="sector-name">${s.name}</div>
+        <div class="sector-bar-track">
+          <div class="sector-bar-fill" style="width:${w}%;background:${s.color}"></div>
+        </div>
+        <div class="sector-pct" style="color:${s.color}">${sign}${s.pct.toFixed(2)}%</div>
+      </div>`;
+  }).join('');
+
+  const movers = [
+    { symbol: 'NVDA', name: 'NVIDIA', pct: 4.21, up: true },
+    { symbol: 'TSLA', name: 'Tesla', pct: 3.16, up: true },
+    { symbol: 'AMZN', name: 'Amazon', pct: 2.88, up: true },
+    { symbol: 'MSFT', name: 'Microsoft', pct: 1.25, up: true },
+    { symbol: 'INTC', name: 'Intel', pct: -3.44, up: false },
+    { symbol: 'BA', name: 'Boeing', pct: -2.77, up: false },
+    { symbol: 'JPM', name: 'JPMorgan', pct: -0.88, up: false },
+  ];
+
+  document.getElementById('movers').innerHTML = movers.map(m => `
+    <div class="mover-row">
+      <div>
+        <div class="mover-symbol">${m.symbol}</div>
+        <div class="mover-name">${m.name}</div>
+      </div>
+      <div class="mover-pct ${m.up ? 'up' : 'down'}">${m.up ? '▲' : '▼'} ${m.up ? '+' : ''}${m.pct.toFixed(2)}%</div>
+    </div>
+  `).join('');
+
+  let indexVal = 5734.28;
+  let indexBase = 5673.57;
+  setInterval(() => {
+    indexVal += (Math.random() - 0.48) * 1.5;
+    const change = indexVal - indexBase;
+    const pct = (change / indexBase) * 100;
+    const up = change >= 0;
+    document.getElementById('indexLevel').textContent = indexVal.toFixed(2);
+    const changeEl = document.getElementById('indexChange');
+    changeEl.textContent = `${up ? '▲' : '▼'} ${up ? '+' : ''}${change.toFixed(2)} (${up ? '+' : ''}${pct.toFixed(2)}%)`;
+    changeEl.className = 'meta-change ' + (up ? 'up' : 'down');
+  }, 2000);
+
+  renderChart('1M');
+</script>
+</body>
+</html>
